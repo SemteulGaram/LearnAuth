@@ -1,36 +1,51 @@
 import fs from 'fs';
+import crypto from 'crypto';
 
-class Config {
+export interface IConfig {
+  mongoHost: string;
+  mongoUser: string;
+  mongoPassword: string;
+  mongoDb: string;
+  mongoUseSrv: boolean;
+  port: number;
+  jsonWebTokenSecreatKey: string;
+}
+
+export class Config {
   static DEFAULT_CONFIG: string;
+  ready: boolean;
   path: string;
-  config: {
-    mongoHost: string,
-    mongoUser: string,
-    mongoPassword: string,
-    mongoDb: string,
-    mongoUseSrv: boolean,
-    port: number
-  };
+  private _v: IConfig; 
 
-  constructor () {
-    throw new Error('Use Config.init(path: string) instead');
+  constructor (path: string) {
+    this.path = path;
+    this._v = JSON.parse(Config.DEFAULT_CONFIG);
+    this.ready = false;
   }
 
-  static async init(path: string): Promise<Config> {
-    const obj: Config = Object.create(Config.prototype);
-    obj.path = path;
+  async init(): Promise<Config> {
     try {
-      obj.config = JSON.parse(await fs.promises.readFile(obj.path, 'utf-8'));
-      return obj;
+      this._v = JSON.parse(await fs.promises.readFile(this.path, 'utf-8'));
+      this.ready = true;
+      return this;
     } catch (err) {
       if (err.code === 'ENOENT') {
         console.debug('Config file not found. creating...');
-        await obj._createConfig();
+        await this._createConfig();
         console.info('Config file created. please edit config.json and restart server');
         process.exit(0);
       }
       throw err;
     }
+  }
+
+  get(key: keyof IConfig): any {
+    if (!this.ready) throw new Error('Config must initialize before use.');
+    return this._v[key];
+  }
+
+  static _createRandomToken () {
+    return crypto.randomBytes(8).toString('hex');
   }
 
   async _createConfig() {
@@ -39,10 +54,10 @@ class Config {
 
   buildMongoUrl(): string {
     return 'mongodb'
-      + (this.config['mongoUseSrv'] ? '+srv' : '')
-      + '://' + ((this.config['mongoUser'] && this.config['mongoPassword']) 
-        ? this.config['mongoUser'] + ':' + this.config['mongoPassword'] + '@' : '')
-      + this.config['mongoHost'] + '/' + this.config['mongoDb'];
+      + (this._v.mongoUseSrv ? '+srv' : '')
+      + '://' + ((this._v.mongoUser && this._v.mongoPassword) 
+        ? this._v.mongoUser + ':' + this._v.mongoPassword + '@' : '')
+      + this._v.mongoHost + '/' + this._v.mongoDb;
   }
 }
 Config.DEFAULT_CONFIG = `{
@@ -51,7 +66,8 @@ Config.DEFAULT_CONFIG = `{
   "mongoPassword": "",
   "mongoDb": "",
   "mongoUseSrv": false,
-  "port": 3000
+  "port": 3000,
+  "jsonWebTokenSecreatKey": "${ Config._createRandomToken() }"
 }`;
 
-export default Config;
+export const instance = new Config('./config.json');

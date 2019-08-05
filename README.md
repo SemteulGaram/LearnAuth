@@ -8,6 +8,7 @@ use with
   - MongoDB Compass Community (for look up database)
 - node.js
   - express.js
+- Postman
 
 ---
 

@@ -1,6 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import Config from './config';
+import { instance as config } from './config';
 
 // Import Routes
 import routeAuth from './routes/auth';
@@ -9,9 +9,8 @@ import { rejects } from 'assert';
 ;(async () => {
   // Read config
   console.debug('read config...');
-  let config: Config;
   try {
-    config = await Config.init('./config.json');
+    await config.init();
   } catch (err) {
     console.error(err);
     return process.exit(1);
@@ -32,6 +31,6 @@ import { rejects } from 'assert';
   // Routes Middleware
   app.use('/api/user', routeAuth);
 
-  app.listen(config.config.port, () => console.log('Server Up and running'));
+  app.listen(config.get('port'), () => console.log('Server Up and running'));
 
 })();
