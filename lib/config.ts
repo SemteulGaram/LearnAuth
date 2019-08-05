@@ -8,26 +8,41 @@ class Config {
     mongoUser: string,
     mongoPassword: string,
     mongoDb: string,
+    mongoUseSrv: boolean,
     port: number
   };
 
-  constructor (path: string) {
-    this.path = path;
-    this.config = {
-      mongoHost: '',
-      mongoUser: '',
-      mongoPassword: '',
-      mongoDb: '',
-      port: 0
-    };
+  constructor () {
+    throw new Error('Use Config.init(path: string) instead');
   }
 
-  async init() {
-   this.config = JSON.parse(await fs.promises.readFile(this.path, 'utf-8'));
+  static async init(path: string): Promise<Config> {
+    const obj: Config = Object.create(Config.prototype);
+    obj.path = path;
+    try {
+      obj.config = JSON.parse(await fs.promises.readFile(obj.path, 'utf-8'));
+      return obj;
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        console.debug('Config file not found. creating...');
+        await obj._createConfig();
+        console.info('Config file created. please edit config.json and restart server');
+        process.exit(0);
+      }
+      throw err;
+    }
   }
 
-  async createConfig() {
+  async _createConfig() {
     return await fs.promises.writeFile(this.path, Config.DEFAULT_CONFIG, 'utf-8');
+  }
+
+  buildMongoUrl(): string {
+    return 'mongodb'
+      + (this.config['mongoUseSrv'] ? '+srv' : '')
+      + '://' + ((this.config['mongoUser'] && this.config['mongoPassword']) 
+        ? this.config['mongoUser'] + ':' + this.config['mongoPassword'] + '@' : '')
+      + this.config['mongoHost'] + '/' + this.config['mongoDb'];
   }
 }
 Config.DEFAULT_CONFIG = `{
@@ -35,6 +50,7 @@ Config.DEFAULT_CONFIG = `{
   "mongoUser": "",
   "mongoPassword": "",
   "mongoDb": "",
+  "mongoUseSrv": false,
   "port": 3000
 }`;
 
